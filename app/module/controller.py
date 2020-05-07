@@ -1,9 +1,17 @@
 from flask import request, jsonify
-from app import app
+from app import app, db
 from .models import *
 from .const import HttpStatus
+from app.api.auth import basic_auth, token_auth
+
+
+from flask_login import current_user, login_required
+
+
+
 
 @app.route('/', methods=['GET', 'POST'])
+@login_required
 def index():
     if request.method == 'POST':
         print("<Request: {}>".format(request.json))
@@ -13,6 +21,8 @@ def index():
 
 
 @app.route('/api/v1/codes', methods=['GET', 'POST'])
+@token_auth.login_required
+
 def promoCodes():
     if request.method == 'GET':
         res = []
@@ -31,8 +41,14 @@ def promoCodes():
         response.status_code = HttpStatus.OK
 
     elif request.method == 'POST':
-        value = None if request.json['body']['value'] is "" else request.json['body']['value']
-        sticker_id = None if request.json['body']['sticker_id'] is "" else request.json['body']['sticker_id']
+
+        print('request.json: ', request.json, '\n'*2)
+        #value = None if request.json['body']['value'] is "" else request.json['body']['value']
+        value = None if request.json['value'] is "" else request.json['value']
+
+        #sticker_id = None if request.json['body']['sticker_id'] is "" else request.json['body']['sticker_id']
+        sticker_id = None if request.json['sticker_id'] is "" else request.json['sticker_id']
+
         construct = {}
         try:
             mhs = PromoCode(value=value, sticker_id=sticker_id)
@@ -53,6 +69,8 @@ def promoCodes():
 
 
 @app.route('/api/v1/stickers', methods=['GET', 'POST'])
+@token_auth.login_required
+
 def stickers_main():
     if request.method == 'GET':
         res = []
@@ -73,8 +91,10 @@ def stickers_main():
         response.status_code = HttpStatus.OK
 
     elif request.method == 'POST':
-        path = None if request.json['body']['path'] is "" else request.json['body']['path']
-        link = None if request.json['body']['link'] is "" else request.json['body']['link']
+        #path = None if request.json['body']['path'] is "" else request.json['body']['path']
+        path = None if request.json['path'] is "" else request.json['path']
+
+        link = None if request.json['link'] is "" else request.json['link']
         construct = {}
         try:
             mhs = Sticker(path=path, link=link)
@@ -94,7 +114,9 @@ def stickers_main():
     return response
 
 
-@app.route('/api/v1/sticker/<string:code>', methods=['GET', 'POST'])
+@app.route('/api/v1/sticker/<string:code>', methods=['POST'])
+@token_auth.login_required
+
 def stickers(code):
     '''
     stickers = Sticker.query.all()
@@ -116,6 +138,9 @@ def stickers(code):
         response.status_code = HttpStatus.OK
         '''
 
+
+
+
     if request.method == 'POST':
         code_for_sticker = PromoCode.query.filter_by(value=code).first()
 
@@ -132,6 +157,10 @@ def stickers(code):
                 'link': sticker.link
                         }
                     }
+
+        # delete used code
+        db.session.delete(code_for_sticker)
+        db.session.commit()
 
         response = jsonify(construct)
         response.status_code = HttpStatus.OK
